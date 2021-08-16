@@ -1,8 +1,0 @@
-
-DELETE VARIABLES  
-q72_1
-q72_2 
-q72_3 
-q72_4 
-q72_5 
-q72_6 .
