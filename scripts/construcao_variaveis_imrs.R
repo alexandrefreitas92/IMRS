@@ -10,6 +10,7 @@
 library(tidyverse)
 library(openxlsx)
 library(readxl)
+library(abjutils)
 
 # CRAS, CREAS, CONSELHO E GESTÃO
 
@@ -85,63 +86,83 @@ gestao_mun_var_rh <- gestao_mun_rh %>%
          "escolaridade" = q65_9) %>%
   mutate(base = "Gestão Municipal")
 
-# Conselho
-conselho_var_rh
-
 # Juntar bases
 trabalhadores <- bind_rows(cras_var_rh, creas_var_rh, gestao_mun_var_rh)
 
 trabalhadores <- trabalhadores %>%
   mutate_if(is.character, str_trim) %>%
-  mutate_if(is.character, str_to_upper)
+  mutate_if(is.character, str_to_upper) %>%
+  mutate_if(is.character, rm_accent)
 
 # Testar consistência das variaveis
-trabalhadores %>%
+vinculo <- trabalhadores %>%
   count(vinculo)
 
-trabalhadores %>%
+funcao <- trabalhadores %>%
   count(funcao)
 
-trabalhadores_profissao <- trabalhadores %>%
+profissao <- trabalhadores %>%
   count(profissao)
 
-trabalhadores %>%
+nivel_escolaridade <- trabalhadores %>%
   count(niveis_escolaridade)
 
-trabalhadores %>%
+escolaridade <- trabalhadores %>%
   count(escolaridade)
 
-#######################################################
-################################
-#
-# Parei na parte que corrige as variáveis para juntar!
-#
-###############################
-#######################################################
+# Corrigir inconsistencias
+trabalhadores <- trabalhadores %>%
+  mutate(vinculo = case_when(vinculo %in% c("COMISSIONADA(O)", "COMISSIONADO") ~ "COMISSIONADA(O)",
+                             vinculo %in% c("EMPREGADA(O) PUBLICA(O) (CLT)", "EMPREGADO PUBLICO CELETISTA (CLT)") ~ "EMPREGADA(O) PUBLICA(O) (CLT)",
+                             vinculo %in% c("SERVIDOR TEMPORARIO", "SERVIDOR(A) TEMPORARIA(O)") ~ "SERVIDOR(A) TEMPORARIA(O)",
+                             vinculo %in% c("SERVIDOR ESTATUTARIO", "SERVIDOR(A)/ESTATUTARIA(O)") ~ "SERVIDOR(A)/ESTATUTARIO(A)",
+                             vinculo %in% c("TERCEIRIZADA(O)", "TERCEIRIZADO") ~ "TERCEIRIZADA(O)",
+                             vinculo %in% c("TRABALHADOR DE EMPRESA/COOPERATIVA/ENTIDADE PRESTADORA DE SERVICOS", "TRABALHADOR(A) DE EMPRESA, COOPERATIVA OU ENTIDADE PRESTADORA DE SERVICOS",
+                                            "TRABALHADOR(A) DE EMPRESA/ COOPERATIVA/ ENTIDADE PRESTADORA DE SERVICOS") ~ "TRABALHADOR(A) DE EMPRESA, COOPERATIVA OU ENTIDADE PRESTADORA DE SERVICOS",
+                             vinculo %in% c("VOLUNTARIA(O)", "VOLUNTARIO") ~ "VOLUNTARIA(O)",
+                             TRUE ~ vinculo
+                             ),
+         funcao = case_when(funcao %in% c("ESTAGIARIA(O)", "ESTAGIARIO(A)") ~ "ESTAGIARIA(O)",
+                            funcao %in% c("COORDENADOR(A)" , "COORDENADOR(A)/DIRIGENTE") ~ "COORDENADOR(A)/DIRIGENTE",
+                            funcao %in% c("EDUCADOR(A) SOCIAL", "EDUCADOR(A)/ORIENTADOR(A) SOCIAL") ~ "EDUCADOR(A)/ORIENTADOR(A) SOCIAL",
+                            str_detect(funcao, "SERVICOS GERAIS") ~ "SERVIÇOS GERAIS",
+                            str_detect(funcao, "NIVEL MEDIO") ~ "TECNICA(O) DE NIVEL MEDIO",
+                            str_detect(funcao, "NIVEL SUPERIOR") ~ "TECNICA(O) DE NIVEL SUPERIOR",
+                            TRUE ~ funcao
+                            ),
+         escolaridade = str_remove_all(escolaridade, "ENSINO ")
+         )
+
+rm(vinculo, funcao, profissao, nivel_escolaridade, escolaridade)
 
 # * Resumo RH -------------------------------------------------------------
 
+trabalhadores %>%
+  filter(profissao == "ASSISTENTE SOCIAL") %>%
+  count(niveis)
+
 rh_sintese <- trabalhadores %>%
   group_by(IBGE7) %>%
-  summarise(B_RHTOTALA = n(),
-            B_RHTOTALB = sum(q56_12 != "Estagiário(a)"),
-            B_RHAS = sum(q56_10 == "Assistente Social"),
-            B_RHASPS = sum(q56_10 == "Assistente Social") / sum(d_56_9 == "Nível Superior") * 100,
-            B_RHPSI = sum(q56_10 == "Psicóloga(o)"),
-            B_RHPSIPS = sum(q56_10 == "Psicóloga(o)") / sum(d_56_9 == "Nível Superior") * 100,
-            B_RHENME = sum(d_56_9 == "Nível Médio"),
-            B_RHCURSU = sum(d_56_9 == "Nível Superior"),
-            B_RHPOSGRA = sum(q56_9 %in% c("Especialização", "Mestrado", "Doutorado")),
-            B_RHTOEST = sum(q56_11 == "Servidor Estatutário"),
-            B_RHTOCEL = sum(q56_11 == "Empregado Público Celetista (CLT)"),
-            B_RHVPOAAS = sum(q56_11 %in% c("Servidor Estatutário", "Empregado Público Celetista (CLT)")) / n() * 100,
-            B_RHVINEST = sum(q56_11 == "Servidor Estatutário") / n() * 100
+  summarise(B_RHTOTALA = n(), # Número de funcionários da Assistência Social (com estagiário)
+            B_RHTOTALB = sum(funcao != "ESTAGIARIA(O)"), # Número de funcionários da Assistência Social (sem estagiário)
+            B_RHAS = sum(profissao == "ASSISTENTE SOCIAL"), # Número de assistentes sociais atuando na Assistência Social 
+            B_RHASPS = sum(profissao == "ASSISTENTE SOCIAL") / sum(niveis_escolaridade == "NIVEL SUPERIOR") * 100, # Percentual de assistentes sociais atuando na Assistência Social em relação ao total de pessoal de nível superior 
+            B_RHPSI = sum(profissao == "PSICOLOGA(O)"), # Número de psicólogos atuando na Assistência Social 
+            B_RHPSIPS = sum(profissao == "PSICOLOGA(O)") / sum(niveis_escolaridade == "NIVEL SUPERIOR") * 100, # Percentual de psicólogos atuando na Assistência Social em relação ao total de pessoal de nível superior 
+            B_RHENME = sum(niveis_escolaridade == "NIVEL MEDIO"), # Número de funcionários com ensino médio ocupados na Assistência Social 
+            B_RHCURSU = sum(niveis_escolaridade == "NIVEL SUPERIOR"), # Número de funcionários com curso superior ocupados na Assistência Social
+            B_RHPOSGRA = sum(escolaridade %in% c("ESPECIALIZACAO", "MESTRADO", "DOUTORADO")), # Número de funcionários com pós-graduação ocupados na Assistência Social
+            B_RHTOEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)"), # Número de funcionários  estatutários ocupados na Assistência Social 
+            B_RHTOCEL = sum(vinculo == "EMPREGADA(O) PUBLICA(O) (CLT)"), # Número de funcionários celetistas ocupados na assistência Social 
+            B_RHVPOAAS = sum(vinculo %in% c("SERVIDOR(A)/ESTATUTARIO(A)", "EMPREGADA(O) PUBLICA(O) (CLT)")) / n() * 100, # Percentual do pessoal estatutário e celestita ocupado na área de Assistência Social
+            B_RHVINEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)") / n() * 100, # Percentual do pessoal estatutário ocupado na área de Assistência Social
+     #       B_RHTPOASPH = # Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes
             )
-
-
-
-creas_rh %>%
-  count(q58_8)
+#
+#
+#
+#creas_rh %>%
+#  count(q58_8)
 
 # OK Número de funcionários da Assistência Social (com estagiário)
 # OK Número de funcionários da Assistência Social (sem estagiário)
