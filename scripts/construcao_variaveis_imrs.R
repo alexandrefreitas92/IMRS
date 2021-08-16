@@ -33,19 +33,19 @@ creas_rh <- read.xlsx("data/CREAS/Censo_SUAS_2019_RH_CREAS_divulgacao.xlsx") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
 
 ## Gestao Municipal
-gestao_mun_geral <- read_csv2("data/Gestão Municipal/Censo_SUAS_2019_Gestao_Municipal_dados_gerais_divulgacao.csv") %>%
+gestao_mun_geral <- read_csv2("data/gestao_municipal/Censo_SUAS_2019_Gestao_Municipal_dados_gerais_divulgacao.csv") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
 
-gestao_mun_rh <- read.xlsx("data/Gestão Municipal/Censo_SUAS_2019_Gestao_Municipal_RH_divulgacao.xlsx") %>%
+gestao_mun_rh <- read.xlsx("data/gestao_municipal/Censo_SUAS_2019_Gestao_Municipal_RH_divulgacao.xlsx") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
 
 ## Conselho Municipal
-conselho_mun_geral <- read.csv("data/Conselho Municipal/Censo_SUAS_2019_Dados_gerais_RH_Conselho_Municipal_divulgacao.csv", 
+conselho_mun_geral <- read.csv("data/conselho_municipal/Censo_SUAS_2019_Dados_gerais_RH_Conselho_Municipal_divulgacao.csv", 
                                sep = ";", header = TRUE,
                                encoding = "latin1") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
 
-conselho_mun_rh <- read.csv("data/Conselho Municipal/Censo_Suas_2019_RH_Conselho_Municipal_divulgacao.csv", 
+conselho_mun_rh <- read.csv("data/conselho_municipal/Censo_Suas_2019_RH_Conselho_Municipal_divulgacao.csv", 
                             sep = ";", header = TRUE,
                             encoding = "latin1") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
@@ -136,10 +136,6 @@ trabalhadores <- trabalhadores %>%
 rm(vinculo, funcao, profissao, nivel_escolaridade, escolaridade)
 
 # * Resumo RH -------------------------------------------------------------
-
-trabalhadores %>%
-  filter(profissao == "ASSISTENTE SOCIAL") %>%
-  count(niveis)
 
 rh_sintese <- trabalhadores %>%
   group_by(IBGE7) %>%

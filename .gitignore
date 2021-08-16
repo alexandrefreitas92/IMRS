@@ -4,5 +4,5 @@
 .Ruserdata
 data/CRAS
 data/CREAS
-'data/Gestão Municipal'
-'data/Conselho Municipal'
+data/gestao_municipal
+data/conselho_municipal
