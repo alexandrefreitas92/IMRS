@@ -11,6 +11,8 @@ library(tidyverse)
 library(openxlsx)
 library(readxl)
 library(abjutils)
+library(data.table)
+library(deflateBR)
 
 # CRAS, CREAS, CONSELHO E GESTÃO
 
@@ -154,38 +156,41 @@ rh_sintese <- trabalhadores %>%
             B_RHVINEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)") / n() * 100, # Percentual do pessoal estatutário ocupado na área de Assistência Social
      #       B_RHTPOASPH = # Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes
             )
-#
-#
-#
-#creas_rh %>%
-#  count(q58_8)
 
-# OK Número de funcionários da Assistência Social (com estagiário)
-# OK Número de funcionários da Assistência Social (sem estagiário)
-# OK Número de assistentes sociais atuando na Assistência Social 
-# OK Percentual de assistentes sociais atuando na Assistência Social em relação ao total de pessoal de nível superior 
-# OK Número de psicólogos atuando na Assistência Social 
-# OK Percentual de psicólogos atuando na Assistência Social em relação ao total de pessoal de nível superior 
-# OK Número de funcionários com ensino médio ocupados na Assistência Social 
-# OK Número de funcionários com curso superior ocupados na Assistência Social
-# OK Número de funcionários com pós-graduação ocupados na Assistência Social
-# OK Número de funcionários estatutários ocupados na Assistência Social 
-# OK Número de funcionários celetistas ocupados na assistência Social 
-# Grau de instrução do pessoal ocupado na área de Assistência Social
-# OK Percentual do pessoal estatutário e celestita ocupado na área de Assistência Social
-# OK Percentual do pessoal estatutário ocupado na área de Assistência Social
 
-# B_RHTOTALA
-# B_RHTOTALB
-# B_RHAS
-# B_RHASPS
-# B_RHPSI
-# B_RHPSIPS
-# B_RHENME
-# B_RHCURSU
-# B_RHPOSGRA
-# B_RHTOEST
-# B_RHTOCEL
-# B_RHGIPOAS
-# B_RHVPOAAS
-# B_RHVINEST
+# * Variaveis CadUnico ----------------------------------------------------
+
+
+# * * Ler base de dados ---------------------------------------------------
+
+cadpes <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/dezembro/pessoa.csv", 
+                select = c("p.cod_familiar_fam","p.cd_ibge", "p.cod_deficiencia_memb",
+                           "p.cod_trabalhou_memb", "p.cod_afastado_trab_memb",
+                           "p.cod_sabe_ler_escrever_memb", "dta_nasc_pessoa"))
+
+caddom <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/dezembro/familia.csv", 
+                select = c("d.cod_familiar_fam", "d.marc_pbf", "d.fx_rfpc",
+                           "d.cod_abaste_agua_domic_fam", "d.cod_escoa_sanitario_domic_fam",
+                           "d.cod_destino_lixo_domic_fam", "d.vlr_renda_media_fam"))
+
+caddompes <- left_join(cadpes, caddom, by = c("p.cod_familiar_fam" = "d.cod_familiar_fam"))
+
+#deflate(vlr_renda_media_fam, data_do_cadastro, 31-12-2019, index = c("ipca"))
+
+# Corrigindo variaveis
+
+cadpes_2 <- cadpes %>%
+  mutate(data_do_cadastro = as.Date(d.dat_atual_fam),
+         data_nascimento = as.Date(p.dta_nasc_pessoa),
+         diff_data = difftime(data_do_cadastro, data_nascimento, units = "days"),
+         idade = diff_data/365,
+         idade = as.integer(idade),
+         )
+
+resumo <- cadpes %>%
+  group_by(cd_ibge) %>%
+  summarise(pop_pobres_ext_pobres = sum(d.fx_rfpc <= 2),
+            pop_total_cad = n(),
+            pop_pbf = sum(d.marc_pbf == 1),
+            perc_pobre_ext_pobre_cad = sum(d.fx_rfpc <= 2) / n(),
+            )
