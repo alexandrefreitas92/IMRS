@@ -19,6 +19,10 @@ library(deflateBR)
 # Ler base de dados -------------------------------------------------------
 rm(list=ls())
 
+## Populacao 2019
+pop_2019 <- read_xlsx('data/IMRS/IMRS-População 2000 a 2019.xlsx') %>%
+  filter(ANO == 2019)
+
 ## CRAS
 cras_rh <- read.xlsx("data/CRAS/Censo_SUAS_2019_CRAS_RH_divulgacao.xlsx") %>%
   filter(str_sub(IBGE7, 1, 2) == "31")
@@ -139,7 +143,7 @@ rm(vinculo, funcao, profissao, nivel_escolaridade, escolaridade)
 
 # * Resumo RH -------------------------------------------------------------
 
-rh_sintese <- trabalhadores %>%
+imrs_rh <- trabalhadores %>%
   group_by(IBGE7) %>%
   summarise(B_RHTOTALA = n(), # Número de funcionários da Assistência Social (com estagiário)
             B_RHTOTALB = sum(funcao != "ESTAGIARIA(O)"), # Número de funcionários da Assistência Social (sem estagiário)
@@ -153,9 +157,10 @@ rh_sintese <- trabalhadores %>%
             B_RHTOEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)"), # Número de funcionários  estatutários ocupados na Assistência Social 
             B_RHTOCEL = sum(vinculo == "EMPREGADA(O) PUBLICA(O) (CLT)"), # Número de funcionários celetistas ocupados na assistência Social 
             B_RHVPOAAS = sum(vinculo %in% c("SERVIDOR(A)/ESTATUTARIO(A)", "EMPREGADA(O) PUBLICA(O) (CLT)")) / n() * 100, # Percentual do pessoal estatutário e celestita ocupado na área de Assistência Social
-            B_RHVINEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)") / n() * 100, # Percentual do pessoal estatutário ocupado na área de Assistência Social
-     #       B_RHTPOASPH = # Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes
-            )
+            B_RHVINEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)") / n() * 100, # Percentual do pessoal estatutário ocupado na área de Assistência Socia
+            ) %>%
+  left_join(pop_2019[, c(2,4)], by = "IBGE7") %>%
+  mutate(B_RHTPOASPH = B_RHTOTALA / `População total` * 10000)# Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes)
 
 
 # * Variaveis CadUnico ----------------------------------------------------
@@ -163,34 +168,90 @@ rh_sintese <- trabalhadores %>%
 
 # * * Ler base de dados ---------------------------------------------------
 
-cadpes <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/dezembro/pessoa.csv", 
-                select = c("p.cod_familiar_fam","p.cd_ibge", "p.cod_deficiencia_memb",
-                           "p.cod_trabalhou_memb", "p.cod_afastado_trab_memb",
-                           "p.cod_sabe_ler_escrever_memb", "dta_nasc_pessoa"))
+cadpes <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/pessoa.csv", 
+                select = c("p.cod_familiar_fam","cd_ibge", "cod_deficiencia_memb",
+                           "cod_trabalhou_memb", "cod_afastado_trab_memb",
+                           "cod_sabe_ler_escrever_memb", "dta_nasc_pessoa"))
 
-caddom <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/dezembro/familia.csv", 
+caddom <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/familia.csv", 
                 select = c("d.cod_familiar_fam", "d.marc_pbf", "d.fx_rfpc",
-                           "d.cod_abaste_agua_domic_fam", "d.cod_escoa_sanitario_domic_fam",
-                           "d.cod_destino_lixo_domic_fam", "d.vlr_renda_media_fam"))
+                           "cod_abaste_agua_domic_fam", "dat_atual_fam", "cod_escoa_sanitario_domic_fam",
+                           "cod_destino_lixo_domic_fam", "vlr_renda_media_fam"))
 
 caddompes <- left_join(cadpes, caddom, by = c("p.cod_familiar_fam" = "d.cod_familiar_fam"))
 
-#deflate(vlr_renda_media_fam, data_do_cadastro, 31-12-2019, index = c("ipca"))
 
-# Corrigindo variaveis
+cadpes %>%
+  count(cod_deficiencia_memb)
 
-cadpes_2 <- cadpes %>%
-  mutate(data_do_cadastro = as.Date(d.dat_atual_fam),
-         data_nascimento = as.Date(p.dta_nasc_pessoa),
+
+# * * Corrigir variaveis e criar tabela -----------------------------------
+
+caddompes_2 <- caddompes %>%
+  mutate(data_do_cadastro = as.Date(dat_atual_fam),
+         data_nascimento = as.Date(dta_nasc_pessoa),
          diff_data = difftime(data_do_cadastro, data_nascimento, units = "days"),
          idade = diff_data/365,
          idade = as.integer(idade),
+         renda = deflate(vlr_renda_media_fam, data_do_cadastro, "12/2019", index = c("ipca"))
          )
 
-resumo <- cadpes %>%
+#> VOU FAZER A RENDA COM O D.FX_RFPC E DEPOIS DE CONVERSAR COM A HELENA EU TROCO.
+
+imrs_cad <- caddompes_2 %>%
   group_by(cd_ibge) %>%
-  summarise(pop_pobres_ext_pobres = sum(d.fx_rfpc <= 2),
+  summarise(pop_pobres_pobre_e_ext_pobres = sum(d.fx_rfpc <= 2),
             pop_total_cad = n(),
             pop_pbf = sum(d.marc_pbf == 1),
-            perc_pobre_ext_pobre_cad = sum(d.fx_rfpc <= 2) / n(),
-            )
+            B_POPPOBEXTRCAD = pop_pobres_pobre_e_ext_pobres / pop_total_cad * 100,
+            B_DEFPOBEXTRCAD = sum(cod_deficiencia_memb == 1 & idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(cod_deficiencia_memb == 1 & idade %in% c(18:64)) * 100,
+            B_POPIDPOBEXTRCAD = sum(idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(idade %in% c(18:64)) * 100,
+            B_POPIDPOBEXTRCADS = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64) & d.fx_rfpc <= 2, na.rm = TRUE) / sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE) * 100,
+            B_POPIDCADS = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE) / sum(idade %in% c(18:64), na.rm = TRUE) * 100,
+            B_IDOSOPOBEXTRPOBCADS = sum(idade >= 65 & d.fx_rfpc <= 2) / sum(idade >= 65) * 100,
+            B_PENLECAD = sum(cod_sabe_ler_escrever_memb == 2 & idade >= 15, na.rm = TRUE) / sum(idade >= 15, na.rm = TRUE) * 100,
+            B_PVULSANEACAD = sum(cod_abaste_agua_domic_fam %in% c(2:4) & cod_escoa_sanitario_domic_fam %in% c(3:6) & cod_destino_lixo_domic_fam %in% c(3:6), na.rm = TRUE) / pop_total_cad * 100
+            # Tem que ter os 3 ou cada um dos 3?
+            ) %>%
+  left_join(pop_2019[,c(2,4)], by = c("cd_ibge" = "IBGE7")) %>%
+  mutate(B_POPPOBEXTRPOB = pop_pobres_pobre_e_ext_pobres / `População total` * 100,
+         B_POPCADUNICO = pop_total_cad / `População total` * 100,
+         B_COBBF = pop_pbf / `População total` * 100,
+         # B_POPIDCADSPOP
+         )
+
+
+# Vis Data ----------------------------------------------------------------
+
+#> Cobertura BPF - Cad Outubro de 2019
+fam_cad_10_2019 <- read_csv("data/cad e bpc/fam_cad_10_2019.csv") %>%
+  filter(UF == "MG")
+
+fam_cad_pbf_10_2019 <- read_csv("data/cad e bpc/fam_pbf_10_2019.csv") %>%
+  filter(UF == "MG")
+
+fam_cad_mais_meio_sm_10_2019 <- read_csv("data/cad e bpc/fam_cad_mais_meio_sm_10_2019.csv") %>%
+  filter(UF == "MG")
+
+imrs_fam_cad_10_2019 <- left_join(fam_cad_10_2019, fam_cad_pbf_10_2019[,c(1,5)], by = "Código") %>%
+  left_join(fam_cad_mais_meio_sm_10_2019[,c(1,5)], by = "Código")
+
+imrs_fam_cad_10_2019 <- imrs_fam_cad_10_2019 %>%
+  mutate(fam_menos_meio_sm = `Famílias inscritas no Cadastro Único` - `Famílias inscritas no Cadastro Único com renda maior que meio salário mínimo`,
+         B_PCOBBFMEIOSAL = `Famílias beneficiárias do Programa Bolsa Família` / fam_menos_meio_sm *100) %>%
+  select(1, 9)
+
+
+#> BPC
+bpc_deficiencia <- read_csv("data/cad e bpc/bpc_deficiencia_12_2019.csv") %>%
+  filter(UF == "MG")
+
+bpc_idoso <- read_csv("data/cad e bpc/bpc_idoso_12_2019.csv") %>%
+  filter(UF == "MG")
+
+bpc <- left_join(bpc_idoso, bpc_deficiencia[,c(1,5)], by = "Código")
+
+bpc <- bpc %>%
+  mutate(bpc_total = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` + `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador`,
+         B_BPCPID = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100,
+         B_BPCPDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100)
