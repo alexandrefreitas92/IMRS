@@ -203,6 +203,7 @@ imrs_cad <- caddompes_2 %>%
   summarise(pop_pobres_pobre_e_ext_pobres = sum(d.fx_rfpc <= 2),
             pop_total_cad = n(),
             pop_pbf = sum(d.marc_pbf == 1),
+            pop_idade_ativa_desocupada = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE),
             B_POPPOBEXTRCAD = pop_pobres_pobre_e_ext_pobres / pop_total_cad * 100,
             B_DEFPOBEXTRCAD = sum(cod_deficiencia_memb == 1 & idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(cod_deficiencia_memb == 1 & idade %in% c(18:64)) * 100,
             B_POPIDPOBEXTRCAD = sum(idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(idade %in% c(18:64)) * 100,
@@ -213,11 +214,15 @@ imrs_cad <- caddompes_2 %>%
             B_PVULSANEACAD = sum(cod_abaste_agua_domic_fam %in% c(2:4) & cod_escoa_sanitario_domic_fam %in% c(3:6) & cod_destino_lixo_domic_fam %in% c(3:6), na.rm = TRUE) / pop_total_cad * 100
             # Tem que ter os 3 ou cada um dos 3?
             ) %>%
-  left_join(pop_2019[,c(2,4)], by = c("cd_ibge" = "IBGE7")) %>%
+  left_join(pop_2019[,c(2,4, 20, 30:33)], by = c("cd_ibge" = "IBGE7")) %>%
   mutate(B_POPPOBEXTRPOB = pop_pobres_pobre_e_ext_pobres / `População total` * 100,
          B_POPCADUNICO = pop_total_cad / `População total` * 100,
          B_COBBF = pop_pbf / `População total` * 100,
-         # B_POPIDCADSPOP
+         ) %>%
+  group_by(cd_ibge) %>%
+  mutate(pop_idosa = round(sum(c_across(15:18)), digits = 0),
+         pop_18_64 = `População com 18 anos ou mais de idade` - pop_idosa,
+         B_POPIDCADSPOP = pop_idade_ativa_desocupada / pop_18_64 * 100
          )
 
 
@@ -249,9 +254,23 @@ bpc_deficiencia <- read_csv("data/cad e bpc/bpc_deficiencia_12_2019.csv") %>%
 bpc_idoso <- read_csv("data/cad e bpc/bpc_idoso_12_2019.csv") %>%
   filter(UF == "MG")
 
-bpc <- left_join(bpc_idoso, bpc_deficiencia[,c(1,5)], by = "Código")
+bpc <- left_join(bpc_idoso, bpc_deficiencia[,c(1,5)], by = "Código") %>%
+  left_join(pop_2019[,c(1,4, 30:33)], by = c("Código" = "IBGE6")) %>%
+  group_by(`Código`) %>%
+  mutate(pop_idosa = round(sum(c_across(7:10)), digits = 0)) %>%
+  select(-c(8:11))
 
 bpc <- bpc %>%
   mutate(bpc_total = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` + `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador`,
+         B_BPC = bpc_total / `População total` * 1000,
+         B_BPCDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / `População total` * 1000,
+         B_BPCID = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / `População total` * 1000,
+         B_BPCIDPOPI = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / pop_idosa * 100,
+         # Esse é em percentual ou é em mil idosos? As descrições estão diferentes...
          B_BPCPID = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100,
          B_BPCPDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100)
+
+
+# Gestao Municipal --------------------------------------------------------
+
+
