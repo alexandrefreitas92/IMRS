@@ -180,11 +180,6 @@ caddom <- fread("/home/xedar/Documents/Trabalho/cad/cad_2019/familia.csv",
 
 caddompes <- left_join(cadpes, caddom, by = c("p.cod_familiar_fam" = "d.cod_familiar_fam"))
 
-
-cadpes %>%
-  count(cod_deficiencia_memb)
-
-
 # * * Corrigir variaveis e criar tabela -----------------------------------
 
 caddompes_2 <- caddompes %>%
@@ -271,6 +266,23 @@ bpc <- bpc %>%
          B_BPCPDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100)
 
 
-# Gestao Municipal --------------------------------------------------------
 
+# ID CRAS -----------------------------------------------------------------
+
+imrs_id_cras <- read_xlsx("data/CRAS/IDCRAS_2019_DIVULGAÇÃO_210920.xlsx", skip = 6) %>%
+  rename("id_cras" = ...11) %>%
+  filter(UF == 31)
+
+#define Min-Max normalization function
+min_max_norm <- function(x) {
+  (x - min(x)) / (max(x) - min(x))
+}
+
+imrs_id_cras <- imrs_id_cras %>%
+  group_by(IBGE7) %>%
+  summarise(Município = first(Município),
+            B_INDCRAS = mean(id_cras))
+
+imrs_id_cras <- imrs_id_cras %>%
+  mutate(B_IDCRASME = min_max_norm(B_INDCRAS))
 
