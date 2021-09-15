@@ -6,8 +6,11 @@ Este script busca atualizar as informações do IMRS referentes à área da Assi
 
 ### MDS
 
-https://aplicacoes.mds.gov.br/snas/vigilancia/index2.php
-http://aplicacoes.mds.gov.br/snas/vigilancia/index5.php
+CRAS, CREAS, Gestão Municipal, Fundo Municipal
+- https://aplicacoes.mds.gov.br/snas/vigilancia/index2.php
+
+ID CRAS
+- http://aplicacoes.mds.gov.br/snas/vigilancia/index5.php
 
 Arquivos:
 

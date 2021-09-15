@@ -188,23 +188,33 @@ caddompes_2 <- caddompes %>%
          diff_data = difftime(data_do_cadastro, data_nascimento, units = "days"),
          idade = diff_data/365,
          idade = as.integer(idade),
-         renda = deflate(vlr_renda_media_fam, data_do_cadastro, "12/2019", index = c("ipca"))
-         )
-
-#> VOU FAZER A RENDA COM O D.FX_RFPC E DEPOIS DE CONVERSAR COM A HELENA EU TROCO.
+         ano_do_cadastro = str_sub(data_do_cadastro, 1, 4),
+         renda = case_when(ano_do_cadastro %in% c("2014", "2015") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2015", index = c("ipca")),
+                           ano_do_cadastro %in% c("2016", "2017") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2017", index = c("ipca")),
+                           ano_do_cadastro %in% c("2018", "2019") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2019", index = c("ipca"))),
+         fx_rfpc = case_when(ano_do_cadastro %in% c("2014", "2015") & renda <= 77 ~ 1,
+                             ano_do_cadastro %in% c("2014", "2015") & renda > 77 & renda <= 154 ~ 2,
+                             ano_do_cadastro %in% c("2014", "2015") & renda > 154 ~ 3,
+                             ano_do_cadastro %in% c("2016", "2017") & renda <= 85 ~ 1,
+                             ano_do_cadastro %in% c("2016", "2017") & renda > 85 & renda <= 170 ~ 2,
+                             ano_do_cadastro %in% c("2016", "2017") & renda > 170 ~ 3,
+                             ano_do_cadastro %in% c("2018", "2019") & renda <= 89 ~ 1,
+                             ano_do_cadastro %in% c("2018", "2019") & renda > 89 & renda <= 178 ~ 2,
+                             ano_do_cadastro %in% c("2018", "2019") & renda > 178 ~ 3)
+  )
 
 imrs_cad <- caddompes_2 %>%
   group_by(cd_ibge) %>%
-  summarise(pop_pobres_pobre_e_ext_pobres = sum(d.fx_rfpc <= 2),
+  summarise(pop_pobres_pobre_e_ext_pobres = sum(fx_rfpc <= 2),
             pop_total_cad = n(),
             pop_pbf = sum(d.marc_pbf == 1),
             pop_idade_ativa_desocupada = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE),
             B_POPPOBEXTRCAD = pop_pobres_pobre_e_ext_pobres / pop_total_cad * 100,
-            B_DEFPOBEXTRCAD = sum(cod_deficiencia_memb == 1 & idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(cod_deficiencia_memb == 1 & idade %in% c(18:64)) * 100,
-            B_POPIDPOBEXTRCAD = sum(idade %in% c(18:64) & d.fx_rfpc <= 2) / sum(idade %in% c(18:64)) * 100,
-            B_POPIDPOBEXTRCADS = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64) & d.fx_rfpc <= 2, na.rm = TRUE) / sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE) * 100,
+            B_DEFPOBEXTRCAD = sum(cod_deficiencia_memb == 1 & idade %in% c(18:64) & fx_rfpc <= 2) / sum(cod_deficiencia_memb == 1 & idade %in% c(18:64)) * 100,
+            B_POPIDPOBEXTRCAD = sum(idade %in% c(18:64) & fx_rfpc <= 2) / sum(idade %in% c(18:64)) * 100,
+            B_POPIDPOBEXTRCADS = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64) & fx_rfpc <= 2, na.rm = TRUE) / sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE) * 100,
             B_POPIDCADS = sum(cod_trabalhou_memb == 2 & cod_afastado_trab_memb == 2 & idade %in% c(18:64), na.rm = TRUE) / sum(idade %in% c(18:64), na.rm = TRUE) * 100,
-            B_IDOSOPOBEXTRPOBCADS = sum(idade >= 65 & d.fx_rfpc <= 2) / sum(idade >= 65) * 100,
+            B_IDOSOPOBEXTRPOBCADS = sum(idade >= 65 & fx_rfpc <= 2) / sum(idade >= 65) * 100,
             B_PENLECAD = sum(cod_sabe_ler_escrever_memb == 2 & idade >= 15, na.rm = TRUE) / sum(idade >= 15, na.rm = TRUE) * 100,
             B_PVULSANEACAD = sum(cod_abaste_agua_domic_fam %in% c(2:4) & cod_escoa_sanitario_domic_fam %in% c(3:6) & cod_destino_lixo_domic_fam %in% c(3:6), na.rm = TRUE) / pop_total_cad * 100
             # Tem que ter os 3 ou cada um dos 3?
@@ -273,7 +283,7 @@ imrs_id_cras <- read_xlsx("data/CRAS/IDCRAS_2019_DIVULGAÇÃO_210920.xlsx", skip
   rename("id_cras" = ...11) %>%
   filter(UF == 31)
 
-#define Min-Max normalization function
+# Define Min-Max normalization function
 min_max_norm <- function(x) {
   (x - min(x)) / (max(x) - min(x))
 }
@@ -286,3 +296,8 @@ imrs_id_cras <- imrs_id_cras %>%
 imrs_id_cras <- imrs_id_cras %>%
   mutate(B_IDCRASME = min_max_norm(B_INDCRAS))
 
+
+
+# Fundo Municipal ---------------------------------------------------------
+
+fundo <- read.xlsx("data/fundo_municipal/Censo_SUAS_2018_FM_Dados_Gerais_divulgacao.xlsx")
