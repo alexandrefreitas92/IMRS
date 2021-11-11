@@ -41,6 +41,3 @@ https://aplicacoes.mds.gov.br/sagi/vis/data3/data-explorer.php
 
 Base identificada de dezembro do ano de referência.
 
-
-
-9 indicadores?

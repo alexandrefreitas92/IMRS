@@ -70,7 +70,6 @@ imrs_creas <- creas_geral %>%
   group_by(IBGE) %>%
   summarise(B_NCREAS = n())
 
-
 # * Selecao variaveis -------------------------------------------------------
 
 # CRAS
@@ -171,7 +170,7 @@ imrs_rh <- trabalhadores %>%
             B_RHVINEST = sum(vinculo == "SERVIDOR(A)/ESTATUTARIO(A)") / n() * 100, # Percentual do pessoal estatutário ocupado na área de Assistência Socia
             ) %>%
   left_join(pop_2019[, c(2,4)], by = "IBGE7") %>%
-  mutate(B_RHTPOASPH = B_RHTOTALA / `População total` * 10000)# Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes)
+  mutate(B_RHTPOASPH = B_RHTOTALA / `População total` * 10000) # Proporção de pessoal ocupado na área de Assistência Social por 10 mil habitantes)
 
 
 # * Variaveis CadUnico ----------------------------------------------------
@@ -194,7 +193,7 @@ caddompes <- left_join(cadpes, caddom, by = c("p.cod_familiar_fam" = "d.cod_fami
 # * * Corrigir variaveis e criar tabela -----------------------------------
 
 caddompes_2 <- caddompes %>%
-  mutate(data_do_cadastro = as.Date(dat_atual_fam),
+  mutate(data_do_cadastro = as.Date("2019-12-31"),
          data_nascimento = as.Date(dta_nasc_pessoa),
          diff_data = difftime(data_do_cadastro, data_nascimento, units = "days"),
          idade = diff_data/365,
@@ -206,19 +205,6 @@ caddompes_2 <- caddompes %>%
                              renda > 89 & renda <= 178 ~ 2,
                              renda > 178 ~ 3)
   )
-
-#renda = case_when(ano_do_cadastro %in% c("2014", "2015") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2015", index = c("ipca")),
-#                  ano_do_cadastro %in% c("2016", "2017") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2017", index = c("ipca")),
-#                  ano_do_cadastro %in% c("2018", "2019") ~ deflate(vlr_renda_media_fam, data_do_cadastro, "12/2019", index = c("ipca"))),
-#fx_rfpc = case_when(ano_do_cadastro %in% c("2014", "2015") & renda <= 77 ~ 1,
-#                    ano_do_cadastro %in% c("2014", "2015") & renda > 77 & renda <= 154 ~ 2,
-#                    ano_do_cadastro %in% c("2014", "2015") & renda > 154 ~ 3,
-#                    ano_do_cadastro %in% c("2016", "2017") & renda <= 85 ~ 1,
-#                    ano_do_cadastro %in% c("2016", "2017") & renda > 85 & renda <= 170 ~ 2,
-#                    ano_do_cadastro %in% c("2016", "2017") & renda > 170 ~ 3,
-#                    ano_do_cadastro %in% c("2018", "2019") & renda <= 89 ~ 1,
-#                    ano_do_cadastro %in% c("2018", "2019") & renda > 89 & renda <= 178 ~ 2,
-#                    ano_do_cadastro %in% c("2018", "2019") & renda > 178 ~ 3
 
 imrs_cad <- caddompes_2 %>%
   group_by(cd_ibge) %>%
@@ -247,6 +233,11 @@ imrs_cad <- caddompes_2 %>%
          B_POPIDCADSPOP = pop_idade_ativa_desocupada / pop_18_64 * 100
          )
 
+# B_CRIANADOLEPOBEXTRPOP
+# B_POPRURALCADS
+# B_POPRURALPOP 
+# B_POPPRETPARDCADS
+# B_POPINDIGENACADS
 
 # Vis Data ----------------------------------------------------------------
 
@@ -265,7 +256,7 @@ imrs_fam_cad_10_2019 <- left_join(fam_cad_10_2019, fam_cad_pbf_10_2019[,c(1,5)],
 
 imrs_fam_cad_10_2019 <- imrs_fam_cad_10_2019 %>%
   mutate(B_FCADMEIOSAL = `Famílias inscritas no Cadastro Único` - `Famílias inscritas no Cadastro Único com renda maior que meio salário mínimo`,
-         B_PCOBBFMEIOSAL = `Famílias beneficiárias do Programa Bolsa Família` / B_FCADMEIOSAL) %>%
+         B_PCOBBFMEIOSAL = `Famílias beneficiárias do Programa Bolsa Família` / B_FCADMEIOSAL * 100) %>%
   select(1, 8, 9)
 
 
@@ -288,11 +279,8 @@ bpc <- bpc %>%
          B_BPCDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / `População total` * 1000,
          B_BPCID = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / `População total` * 1000,
          B_BPCIDPOPI = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / pop_idosa * 100,
-         # Esse é em percentual ou é em mil idosos? As descrições estão diferentes...
          B_BPCPID = `Idosos que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100,
          B_BPCPDEF = `Pessoas com deficiência (PCD) que recebem o Benefício de Prestação Continuada (BPC) por Município pagador` / bpc_total * 100)
-
-
 
 
 # ID CRAS -----------------------------------------------------------------
